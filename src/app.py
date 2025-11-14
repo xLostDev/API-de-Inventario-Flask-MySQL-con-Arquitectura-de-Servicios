@@ -1,97 +1,70 @@
-from flask import Flask, request
-from db import get_connection
+from flask import Flask, request, jsonify 
+
+# Importamos todas las funciones del servicio, no la conexión directa a la DB
+from services.product_service import (
+    get_all_products, 
+    create_product, 
+    update_product, 
+    delete_product
+)
 
 app = Flask(__name__)
 
 # -------------------------
-# Ruta para agregar producto
+# Ruta para listar productos (GET)
+# -------------------------
+@app.route('/productos', methods=['GET'])
+def obtener_productos():
+    # Llama al servicio para obtener los datos.
+    result = get_all_products()
+    
+    # Manejamos el error que el servicio devuelve como una tupla ({"error":...}, 500)
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1] 
+    
+    # Éxito: devolvemos la lista de productos
+    return jsonify(result), 200
+
+# -------------------------
+# Ruta para agregar producto (POST)
 # -------------------------
 @app.route('/agregar', methods=['POST'])
 def agregar_producto():
     data = request.get_json()
 
-    nombre = data.get("nombre")
-    precio = data.get("precio")
-    cantidad = data.get("cantidad")
+    # Llama al servicio para crear el producto
+    result = create_product(data) 
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    # Maneja la respuesta (éxito o error)
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1] 
 
-    cursor.execute(
-        "INSERT INTO productos (nombre, precio, cantidad) VALUES (%s, %s, %s)",
-        (nombre, precio, cantidad)
-    )
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return {"mensaje": "Producto agregado con éxito"}, 201
-
+    return jsonify(result), 201 # 201 Created
 
 # -------------------------
-# Ruta para listar productos
+# Ruta para actualizar datos (PUT)
 # -------------------------
-@app.route('/productos', methods=['GET'])
-def obtener_productos():
-    conn = get_connection()
-    if conn is None:
-        return {"error": "No se pudo conectar a la base de datos"}, 500
-
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM productos")
-    productos = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    return productos, 200
-
-
-# -------------------------
-# Ruta para actualizar datos
-# -------------------------
-@app.route('/editar/<int:id>', methods=['PUT'])
-def editar_producto(id):
+@app.route('/productos/<int:product_id>', methods=['PUT'])
+def update_producto(product_id): 
     data = request.get_json()
-
-    nombre = data.get("nombre")
-    precio = data.get("precio")
-    cantidad = data.get("cantidad")
-    descripcion = data.get("descripcion")
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE productos 
-        SET nombre=%s, precio=%s, cantidad=%s, descripcion=%s
-        WHERE id=%s
-    """, (nombre, precio, cantidad, descripcion, id))
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return {"mensaje": "Producto actualizado correctamente"}, 200
-
+    result = update_product(product_id, data) 
+    
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1]
+        
+    return jsonify(result)
 
 # -------------------------
-# Ruta para eliminar producto
+# Ruta para eliminar producto (DELETE)
 # -------------------------
-@app.route('/eliminar/<int:id>', methods=['DELETE'])
-def eliminar_producto(id):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM productos WHERE id=%s", (id,))
-    conn.commit()
-
-    cursor.close()
-    conn.close()
-
-    return {"mensaje": f"Producto con id {id} eliminado correctamente"}, 200
+@app.route('/productos/<int:product_id>', methods=['DELETE'])
+def eliminar_producto(product_id):
+    result = delete_product(product_id)
+    
+    if isinstance(result, tuple):
+        return jsonify(result[0]), result[1]
+        
+    return jsonify(result)
 
 
 # -------------------------
